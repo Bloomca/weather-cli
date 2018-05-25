@@ -1,27 +1,11 @@
 import argparse
 from app.settings import BING_KEY, DARKSKY_KEY, check_keys
-from app.geo import load_geocodes, choose_resource
+from app.geo import load_geocodes
+from app.input import get_city, choose_resource
 from app.forecast import load_forecast, print_current_weather
 
 # we can't proceed without API keys
 check_keys()
-
-ap = argparse.ArgumentParser()
-ap.add_argument("-c", "--city", help="City to get weather")
-args = vars(ap.parse_args())
-
-def get_city():
-  if 'city' in args and args['city'] is not None:
-    return args['city']
-
-  while True:
-    answer = input('Please provide a city\n > ')
-    print("")
-
-    if len(answer) > 2:
-      return answer
-    else:
-      print("Sorry, name should be more than 2 letters\n")
 
 def get_city_data():
   city = get_city()

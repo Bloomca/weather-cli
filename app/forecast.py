@@ -3,7 +3,7 @@ import datetime
 import requests
 from pytz import timezone
 
-from .geo import get_city_coords, format_city
+from .utils import get_city_coords, format_city, format_temp
 from .settings import DARKSKY_KEY
 
 def load_forecast(city):
@@ -21,20 +21,7 @@ def load_forecast(city):
   r = requests.get(url)
   return r.json()
 
-def c_to_f(temp):
-  """
-  Convert celcius temperature to fahrenheit.
-  """
-  return temp * 1.8 + 32
 
-def f_to_c(temp):
-  """
-  Convert fahrenheit temperature to celcius.
-  """
-  return temp / 1.8 - 32 / 1.8
-
-def format_temp(temperature):
-  return (round(temperature), round(f_to_c(temperature)))
 
 def render_hourly_part(part, tz):
   (f_temp, c_temp) = format_temp(part['temperature'])
