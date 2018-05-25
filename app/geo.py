@@ -3,10 +3,15 @@ import requests
 from pick import pick
 from .settings import BING_KEY
 
+def format_city(city):
+  address = city['address']
+  city = address.get('formattedAddress', '')
+  county = address.get('adminDistrict2', '')
+  country = address.get('countryRegion', '')
+  return "{city}, {county} in {country}".format(city=city, county=county, country=country)
 
 def load_geocodes(city):
   print("loading geodata for {city}...".format(city=city))
-  print("")
   params = {
     'key': BING_KEY,
     'locality': city,
@@ -31,14 +36,10 @@ def choose_resource(resources):
 
   options = []
   items = {}
-  for resource in resources:
-    address = resource['address']
-    city = address.get('formattedAddress', '')
-    county = address.get('adminDistrict2', '')
-    country = address.get('countryRegion', '')
-    formatted_address = "{city}, {county} in {country}".format(city=city, county=county, country=country)
+  for city in resources:
+    formatted_address = format_city(city)
     options.append(formatted_address)
-    items[formatted_address] = resource
+    items[formatted_address] = city
 
   (option, index) = pick(options, title)
   
