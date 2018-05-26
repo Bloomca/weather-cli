@@ -7,7 +7,7 @@ def load_geocodes(city):
   Load geocodes for all cities with this name.
   There will be (probably) more than one city.
   """
-  print("loading geodata for {city}...".format(city=city))
+  print("Loading geodata for {city}...".format(city=city))
   params = {
     'key': BING_KEY,
     'locality': city,

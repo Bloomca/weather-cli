@@ -3,7 +3,8 @@ import datetime
 import requests
 from pytz import timezone
 
-from .utils import get_city_coords, format_city, format_temp
+from .utils import (get_city_coords, format_city,
+                    format_temp, create_date_tz, break_text, calculate_min)
 from .settings import DARKSKY_KEY
 
 def load_forecast(city):
@@ -21,12 +22,10 @@ def load_forecast(city):
   r = requests.get(url)
   return r.json()
 
-
-
 def render_hourly_part(part, tz):
   (f_temp, c_temp) = format_temp(part['temperature'])
 
-  date = datetime.datetime.fromtimestamp(part['time'], tz=tz)
+  date = create_date_tz(part['time'], tz)
   summary = part['summary']
   localFormat = "%A, %d %B %Y, %H:%M:%S %z"
 
@@ -39,7 +38,7 @@ def render_hourly_part(part, tz):
 def render_daily_part(part, tz):
   (f_temp, c_temp) = format_temp(part['temperature'])
 
-  date = datetime.datetime.fromtimestamp(part['time'], tz=tz)
+  date = create_date_tz(part['time'], tz)
   summary = part['summary']
   localFormat = "%A, %d %B %Y, %H:%M %z"
 
@@ -49,6 +48,47 @@ def render_daily_part(part, tz):
   """.format(celcius=c_temp, fahrenheit=f_temp,
              summary=summary, date=date.strftime(localFormat))
 
+def create_tables(data, make_values, skip, columns):
+  """
+  Create tables to display data in a console.
+  """
+
+  if skip < 1:
+    raise ValueError("skip value should be at least 1")
+
+  if columns < 1:
+    raise ValueError("column value should be at least 1")
+
+  # we need separate tables, so table does not overflow
+  tables = []
+  values = []
+  i = 0
+  for part in data:
+    i += 1
+
+    # we don't want to show weather for every hour, so we pick
+    # only every 3rd hour
+    if i % skip == 0:
+      value = make_values(part)
+      values.append(value)
+      # 6 columns is enough, otherwise won't fit into a regular
+      # terminal screen, so we break our data into several tables
+      if i > skip * (columns - 1):
+        i = 0
+        tables.append(values)
+        values = []
+
+
+  if len(values):
+    tables.append(values)
+
+  tables_values = []
+  for table in tables:
+    table_values = zip(*table)
+    tables_values.append(table_values)
+
+  return tables_values
+
 def print_today(forecast, tz):
   """
   Print hourly data for the next couple days.
@@ -56,44 +96,27 @@ def print_today(forecast, tz):
   so they don't overflow on the terminal screen.
   """
 
-  # we need separate tables, so table does not overflow
-  hourly_tables = []
-  hourly_values = []
-  i = 0
-  for part in forecast['hourly']['data']:
-    i += 1
+  print(forecast['hourly']['summary'])
+  print("")
 
-    # we don't want to show weather for every hour, so we pick
-    # only every 3rd hour
-    if i % 3 == 0:
-      date = datetime.datetime.fromtimestamp(part['time'], tz=tz)
-      localFormat = "%a %H:%M"
-      
-      (f_temp, c_temp) = format_temp(part['temperature'])
+  def create_values(part):
+    date = create_date_tz(part['time'], tz)
+    localFormat = "%a %H:%M"
+    
+    (f_temp, c_temp) = format_temp(part['temperature'])
 
-      hourly_value = [
-        date.strftime(localFormat),
-        "{celcius}°C/{fahrenheit}°F".format(celcius=c_temp, fahrenheit=f_temp),
-        part['summary']
-      ]
+    return [
+      date.strftime(localFormat),
+      "{celcius}°C/{fahrenheit}°F".format(celcius=c_temp, fahrenheit=f_temp),
+      part['summary']
+    ]
 
-      hourly_values.append(hourly_value)
-      # 6 columns is enough, otherwise won't fit into a regular
-      # terminal screen, so we break our data into several tables
-      if i > 15:
-        i = 0
-        hourly_tables.append(hourly_values)
-        hourly_values = []
-
-
-  if len(hourly_values):
-    hourly_tables.append(hourly_values)
-
-  tables_hourly_values = []
-  for hourly_table in hourly_tables:
-    table_hourly_values = zip(*hourly_table)
-    tables_hourly_values.append(table_hourly_values)
+  data = forecast['hourly']['data']
+  columns = 6
+  tables_hourly_values = create_tables(data, create_values,
+                                       skip = 3, columns = columns)
   
+  padded_length = 20
   for table in tables_hourly_values:
     for row in table:
       str = ""
@@ -107,7 +130,53 @@ def print_today(forecast, tz):
     # draw a separator after each table
     # 20 for padded value, 2 space, 1 for "|" symbol
     # 6 for number of columns
-    print("=" * 23 * 6)
+    print("=" * (padded_length + 3) * columns)
+
+def print_daily(forecast, tz):
+
+  print(forecast['daily']['summary'])
+  print("")
+
+  data = forecast['daily']['data']
+
+  padded_length = 30
+  min = calculate_min(data, lambda item: item['summary'], padded_length - 2)
+
+  def create_values(part):
+    date = create_date_tz(part['time'], tz)
+    (min_f_temp, min_c_temp) = format_temp(part['temperatureLow'])
+    (max_f_temp, max_c_temp) = format_temp(part['temperatureHigh'])
+    min_date = create_date_tz(part['temperatureLowTime'], tz)
+    max_date = create_date_tz(part['apparentTemperatureHighTime'], tz)
+    localFormat = "%d %b, %a"
+
+    minutes_format = "%H:%M"
+    return [
+      date.strftime(localFormat),
+      "Min {celcius}°C/{fahrenheit}°F at {date}".format(celcius=min_c_temp, fahrenheit=min_f_temp, date=min_date.strftime(minutes_format)),
+      "Max {celcius}°C/{fahrenheit}°F at {date}".format(celcius=max_c_temp, fahrenheit=max_f_temp, date=max_date.strftime(minutes_format)),
+      *break_text(part['summary'], padded_length - 2, min=min)
+    ]
+
+  columns = 5
+  tables_hourly_values = create_tables(data, create_values,
+                                       skip = 1, columns = columns)
+
+  
+  for table in tables_hourly_values:
+    for row in table:
+      str = ""
+      for value in row:
+        # to make it like a real table, we need to have
+        # the same width, so we enforce string length
+        str += " {value: <30} |".format(value=value)
+
+      print(str)
+    
+    # draw a separator after each table
+    # 20 for padded value, 2 space, 1 for "|" symbol
+    # 6 for number of columns
+    print("=" * (padded_length + 3) * columns)
 
 def print_current_weather(forecast):
   current_forecast = forecast['currently']
@@ -119,6 +188,5 @@ def print_current_weather(forecast):
   
   print(right_now)
   print_today(forecast, tz)
-
-  for part in forecast['daily']['data']:
-    pass
+  print("")
+  print_daily(forecast, tz)
