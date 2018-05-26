@@ -3,7 +3,7 @@ import datetime
 import requests
 from pytz import timezone
 
-from .utils import (get_city_coords, format_city,
+from .utils import (get_city_coords, format_city, print_underscore,
                     format_temp, create_date_tz, break_text, calculate_min)
 from .settings import DARKSKY_KEY
 
@@ -69,7 +69,7 @@ def create_tables(data, make_values, skip, columns):
     # we don't want to show weather for every hour, so we pick
     # only every 3rd hour
     if i % skip == 0:
-      value = make_values(part)
+      value = make_values(part, len(tables))
       values.append(value)
       # 6 columns is enough, otherwise won't fit into a regular
       # terminal screen, so we break our data into several tables
@@ -96,10 +96,10 @@ def print_today(forecast, tz):
   so they don't overflow on the terminal screen.
   """
 
-  print(forecast['hourly']['summary'])
+  print_underscore(forecast['hourly']['summary'])
   print("")
 
-  def create_values(part):
+  def create_values(part, index):
     date = create_date_tz(part['time'], tz)
     localFormat = "%a %H:%M"
     
@@ -134,15 +134,16 @@ def print_today(forecast, tz):
 
 def print_daily(forecast, tz):
 
-  print(forecast['daily']['summary'])
+  print_underscore(forecast['daily']['summary'])
   print("")
 
   data = forecast['daily']['data']
-
+  columns = 5
   padded_length = 30
-  min = calculate_min(data, lambda item: item['summary'], padded_length - 2)
+  
+  min = calculate_min(data, lambda item: item['summary'], padded_length - 2, columns)
 
-  def create_values(part):
+  def create_values(part, index):
     date = create_date_tz(part['time'], tz)
     (min_f_temp, min_c_temp) = format_temp(part['temperatureLow'])
     (max_f_temp, max_c_temp) = format_temp(part['temperatureHigh'])
@@ -155,10 +156,9 @@ def print_daily(forecast, tz):
       date.strftime(localFormat),
       "Min {celcius}°C/{fahrenheit}°F at {date}".format(celcius=min_c_temp, fahrenheit=min_f_temp, date=min_date.strftime(minutes_format)),
       "Max {celcius}°C/{fahrenheit}°F at {date}".format(celcius=max_c_temp, fahrenheit=max_f_temp, date=max_date.strftime(minutes_format)),
-      *break_text(part['summary'], padded_length - 2, min=min)
+      *break_text(part['summary'], padded_length - 2, min=min[index])
     ]
 
-  columns = 5
   tables_hourly_values = create_tables(data, create_values,
                                        skip = 1, columns = columns)
 

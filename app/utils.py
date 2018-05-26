@@ -52,7 +52,8 @@ def break_text(text, length, min = 1):
   result = []
   while True:
     if len(text) < length:
-      result.append(text.lstrip())
+      if text:
+        result.append(text.lstrip())
       if len(result) < min:
         for x in range(0, min - len(result)):
           result.append("")
@@ -67,18 +68,35 @@ def break_text(text, length, min = 1):
     
     result.append(part_text.lstrip())
 
-def calculate_min(collection, get_text, length):
+def calculate_min(collection, get_text, length, columns):
   """
   Calculate number of rows to display table correctly.
 
   """
+  result = []
   min = 1
+  index = 0
   for item in collection:
+    index += 1
     text = get_text(item)
-    item_min = len(text) // length + 1
+    if (len(text) - 1) % length == 0:
+      item_min = (len(text) - 1) // length
+    else:
+      item_min = (len(text) - 1) // length + 1
 
     if item_min > min:
       min = item_min
+
+    if index == columns:
+      index = 0
+      result.append(min)
+      min = 1
+
+  if index != 0:
+    result.append(min)
   
-  return min
+  return result
+
+def print_underscore(text):
+  print("\033[4m" + text + "\033[0;0m")
 
